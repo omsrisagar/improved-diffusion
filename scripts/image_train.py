@@ -63,7 +63,8 @@ def main():
         num_samples=args.num_samples,
         class_cond=args.class_cond,
         use_ddim=args.use_ddim,
-        clip_denoised=args.clip_denoised
+        clip_denoised=args.clip_denoised,
+        img_disp_nrow=args.img_disp_nrow
     ).run_loop()
 
 
@@ -86,6 +87,7 @@ def create_argparser():
         clip_denoised=True, # below args for sampling
         num_samples=10000,
         use_ddim=False,
+        img_disp_nrow=4
     )
     defaults.update(model_and_diffusion_defaults())
     parser = argparse.ArgumentParser()

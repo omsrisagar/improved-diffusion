@@ -53,7 +53,8 @@ class TrainLoop:
         num_samples=64,
         class_cond=False,
         use_ddim=False,
-        clip_denoised=True
+        clip_denoised=True,
+        img_disp_nrow=4
     ):
         self.model = model
         self.diffusion = diffusion
@@ -80,7 +81,7 @@ class TrainLoop:
         self.class_cond = class_cond
         self.use_ddim = use_ddim
         self.clip_denoised = clip_denoised
-        # self.latest_ema_checkpoint = ''
+        self.img_disp_nrow = img_disp_nrow
 
         self.step = 0
         self.resume_step = 0
@@ -302,7 +303,7 @@ class TrainLoop:
                 clip_denoised=clip_denoised
             )
         arr, label_arr = sample(sample_dict, logger, self.model, self.diffusion)
-        self.write_2images(image_outputs=arr, display_image_num=4, file_name=bf.join(get_blob_logdir(),
+        self.write_2images(image_outputs=arr, display_image_num=self.img_disp_nrow, file_name=bf.join(get_blob_logdir(),
                                                 f"output_{(self.step + self.resume_step):06d}.jpg"))
         #load latest model checkpoint and put in train mode
         self._load_checkpoint(latest_model_checkpoint)
