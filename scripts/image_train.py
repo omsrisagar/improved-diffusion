@@ -10,6 +10,7 @@ from improved_diffusion.resample import create_named_schedule_sampler
 from improved_diffusion.script_util import (
     model_and_diffusion_defaults,
     create_model_and_diffusion,
+    create_gaussian_diffusion,
     args_to_dict,
     add_dict_to_argparser,
 )
@@ -28,6 +29,9 @@ def main():
     )
     model.to(dist_util.dev())
     schedule_sampler = create_named_schedule_sampler(args.schedule_sampler, diffusion)
+
+    # diffusion model for sampling
+    # diffusion_sampling = create_gaussian_diffusion
 
     logger.log("creating data loader...")
     data = load_data(
@@ -54,6 +58,12 @@ def main():
         schedule_sampler=schedule_sampler,
         weight_decay=args.weight_decay,
         lr_anneal_steps=args.lr_anneal_steps,
+        image_size=args.image_size,
+        sample_interval=args.sample_interval,
+        num_samples=args.num_samples,
+        class_cond=args.class_cond,
+        use_ddim=args.use_ddim,
+        clip_denoised=args.clip_denoised
     ).run_loop()
 
 
@@ -69,9 +79,13 @@ def create_argparser():
         ema_rate="0.9999",  # comma-separated list of EMA values
         log_interval=10,
         save_interval=10000,
+        sample_interval=10000,
         resume_checkpoint="",
         use_fp16=False,
         fp16_scale_growth=1e-3,
+        clip_denoised=True, # below args for sampling
+        num_samples=10000,
+        use_ddim=False,
     )
     defaults.update(model_and_diffusion_defaults())
     parser = argparse.ArgumentParser()

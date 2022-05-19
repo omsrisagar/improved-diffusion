@@ -445,6 +445,7 @@ def configure(dir=None, format_strs=None, comm=None, log_suffix=""):
     """
     if dir is None:
         dir = os.getenv("OPENAI_LOGDIR")
+        dir = osp.join(os.getcwd(), 'output', dir)
     if dir is None:
         dir = osp.join(
             tempfile.gettempdir(),

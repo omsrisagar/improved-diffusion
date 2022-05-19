@@ -8,6 +8,7 @@ import torch as th
 import torch.distributed as dist
 from torch.nn.parallel.distributed import DistributedDataParallel as DDP
 from torch.optim import AdamW
+from argparse import Namespace
 
 from . import dist_util, logger
 from .fp16_util import (
@@ -19,6 +20,8 @@ from .fp16_util import (
 )
 from .nn import update_ema
 from .resample import LossAwareSampler, UniformSampler
+from scripts.image_sample import sample
+import torchvision.utils as vutils
 
 # For ImageNet experiments, this was a good default value.
 # We found that the lg_loss_scale quickly climbed to
@@ -45,6 +48,12 @@ class TrainLoop:
         schedule_sampler=None,
         weight_decay=0.0,
         lr_anneal_steps=0,
+        image_size=64, # sampling params
+        sample_interval=10000,
+        num_samples=64,
+        class_cond=False,
+        use_ddim=False,
+        clip_denoised=True
     ):
         self.model = model
         self.diffusion = diffusion
@@ -65,13 +74,20 @@ class TrainLoop:
         self.schedule_sampler = schedule_sampler or UniformSampler(diffusion)
         self.weight_decay = weight_decay
         self.lr_anneal_steps = lr_anneal_steps
+        self.num_samples = num_samples # sampling params
+        self.sample_interval = sample_interval
+        self.image_size = image_size
+        self.class_cond = class_cond
+        self.use_ddim = use_ddim
+        self.clip_denoised = clip_denoised
+        # self.latest_ema_checkpoint = ''
 
         self.step = 0
         self.resume_step = 0
         self.global_batch = self.batch_size * dist.get_world_size()
 
-        self.model_params = list(self.model.parameters())
-        self.master_params = self.model_params
+        self.model_params = list(self.model.parameters()) #self.model_params, self.model.parameters(), self.ema_params # are on cpu
+        self.master_params = self.model_params # self.model_params, list(self.model.parameters()), self.master_params # are the same object; they always have the same value seems like.
         self.lg_loss_scale = INITIAL_LOG_LOSS_SCALE
         self.sync_cuda = th.cuda.is_available()
 
@@ -124,9 +140,20 @@ class TrainLoop:
                     )
                 )
 
+        dist_util.sync_params(self.model.parameters()) # just broadcast each param from rank 0 to all ranks
+
+    def _load_checkpoint(self, checkpoint):
+        if dist.get_rank() == 0:
+            logger.log(f"loading model from checkpoint: {checkpoint}...")
+            self.model.load_state_dict(
+                dist_util.load_state_dict(
+                    checkpoint, map_location=dist_util.dev()
+                )
+            )
+
         dist_util.sync_params(self.model.parameters())
 
-    def _load_ema_parameters(self, rate):
+    def _load_ema_parameters(self, rate): # only used when resuming from checkpoint one time
         ema_params = copy.deepcopy(self.master_params)
 
         main_checkpoint = find_resume_checkpoint() or self.resume_checkpoint
@@ -172,6 +199,9 @@ class TrainLoop:
                 # Run for a finite amount of time in integration tests.
                 if os.environ.get("DIFFUSION_TRAINING_TEST", "") and self.step > 0:
                     return
+            if self.step % self.sample_interval == 0:
+                self.sample_and_write_images(self.num_samples, self.batch_size // 2, self.class_cond, self.use_ddim,
+                                             self.image_size, self.clip_denoised)
             self.step += 1
         # Save the last checkpoint if it wasn't already saved.
         if (self.step - 1) % self.save_interval != 0:
@@ -215,7 +245,7 @@ class TrainLoop:
                     t, losses["loss"].detach()
                 )
 
-            loss = (losses["loss"] * weights).mean()
+            loss = (losses["loss"] * weights).mean() # different timesteps can have different weights if LossAwareSamp
             log_loss_dict(
                 self.diffusion, t, {k: v * weights for k, v in losses.items()}
             )
@@ -246,7 +276,37 @@ class TrainLoop:
         self._anneal_lr()
         self.opt.step()
         for rate, params in zip(self.ema_rate, self.ema_params):
-            update_ema(params, self.master_params, rate=rate)
+            update_ema(params, self.master_params, rate=rate) # keep ema of params; 0.999 to old, 0.001 to current
+
+    def write_2images(self, image_outputs, display_image_num, file_name):
+        image_outputs = image_outputs.expand(-1, 3, -1, -1)  # expand gray-scale images to 3 channels
+        image_grid = vutils.make_grid(image_outputs.data, nrow=display_image_num, padding=0, normalize=True)
+        vutils.save_image(image_grid, file_name)
+
+    def sample_and_write_images(self, num_samples, batch_size, class_cond, use_ddim, image_size, clip_denoised):
+        latest_model_checkpoint = f"model{(self.step + self.resume_step):06d}.pt"
+        latest_model_checkpoint = bf.join(get_blob_logdir(), latest_model_checkpoint)
+        latest_ema_checkpoint = f"ema_{self.ema_rate[0]}_{(self.step + self.resume_step):06d}.pt"
+        latest_ema_checkpoint = bf.join(get_blob_logdir(), latest_ema_checkpoint)
+        # load latest ema checkpoint
+        self._load_checkpoint(latest_ema_checkpoint) #loads ema params, does not modify the existing grad values though.
+        # put model in eval mode
+        self.model.eval()
+
+        sample_dict = Namespace(
+            num_samples=num_samples,
+                batch_size=batch_size,
+                class_cond=class_cond,
+                use_ddim=use_ddim,
+                image_size=image_size,
+                clip_denoised=clip_denoised
+            )
+        arr, label_arr = sample(sample_dict, logger, self.model, self.diffusion)
+        self.write_2images(image_outputs=arr, display_image_num=4, file_name=bf.join(get_blob_logdir(),
+                                                f"output_{(self.step + self.resume_step):06d}.jpg"))
+        #load latest model checkpoint and put in train mode
+        self._load_checkpoint(latest_model_checkpoint)
+        self.model.train()
 
     def _log_grad_norm(self):
         sqsum = 0.0
@@ -270,7 +330,7 @@ class TrainLoop:
 
     def save(self):
         def save_checkpoint(rate, params):
-            state_dict = self._master_params_to_state_dict(params)
+            state_dict = self._master_params_to_state_dict(params) # copy params to state_dict
             if dist.get_rank() == 0:
                 logger.log(f"saving model {rate}...")
                 if not rate:
@@ -293,7 +353,7 @@ class TrainLoop:
 
         dist.barrier()
 
-    def _master_params_to_state_dict(self, master_params):
+    def _master_params_to_state_dict(self, master_params): # copy master_params to state_dict
         if self.use_fp16:
             master_params = unflatten_master_params(
                 self.model.parameters(), master_params
