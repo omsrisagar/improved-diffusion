@@ -1,0 +1,4 @@
+blobfile>=1.0.5
+tqdm
+pillow
+numpy
