@@ -21,7 +21,7 @@ from .fp16_util import (
 from .nn import update_ema
 from .resample import LossAwareSampler, UniformSampler
 from scripts.image_sample import sample
-import torchvision.utils as vutils
+from .script_util import write_2images
 
 # For ImageNet experiments, this was a good default value.
 # We found that the lg_loss_scale quickly climbed to
@@ -136,12 +136,12 @@ class TrainLoop:
             if dist.get_rank() == 0:
                 logger.log(f"loading model from checkpoint: {resume_checkpoint}...")
                 self.model.load_state_dict(
-                    dist_util.load_state_dict(
+                    dist_util.load_state_dict( # rank 0 reads the checkpoint as state_dict in bytes and broadcasts to # other ranks. Returns the read state_dict which can be used by self.model.load_state_dict; # similarly for self.opt.load_state_dict for optimizer checkpoint
                         resume_checkpoint, map_location=dist_util.dev()
                     )
                 )
 
-        dist_util.sync_params(self.model.parameters()) # just broadcast each param from rank 0 to all ranks
+        dist_util.sync_params(self.model.parameters()) # just broadcast each param from rank 0 to all ranks; The # values of the variables inside dist_util.sync_params(...) are synced across ranks. So here the values of # self.model.parameters() are synced across ranks.
 
     def _load_checkpoint(self, checkpoint):
         if dist.get_rank() == 0:
@@ -154,6 +154,10 @@ class TrainLoop:
 
         dist_util.sync_params(self.model.parameters())
 
+    def _load_params(self, params): # load given params
+        state_dict = self._master_params_to_state_dict(params) # copy params to state_dict
+        self.model.load_state_dict(state_dict)
+
     def _load_ema_parameters(self, rate): # only used when resuming from checkpoint one time
         ema_params = copy.deepcopy(self.master_params)
 
@@ -165,9 +169,9 @@ class TrainLoop:
                 state_dict = dist_util.load_state_dict(
                     ema_checkpoint, map_location=dist_util.dev()
                 )
-                ema_params = self._state_dict_to_master_params(state_dict)
+                ema_params = self._state_dict_to_master_params(state_dict) # just returns the values of params in the # state_dict; it obtains the names using self.model.named_parameters()
 
-        dist_util.sync_params(ema_params)
+        dist_util.sync_params(ema_params) # the values of this variable are synced across ranks
         return ema_params
 
     def _load_optimizer_state(self):
@@ -180,7 +184,7 @@ class TrainLoop:
             state_dict = dist_util.load_state_dict(
                 opt_checkpoint, map_location=dist_util.dev()
             )
-            self.opt.load_state_dict(state_dict)
+            self.opt.load_state_dict(state_dict) # why no dist_util.sync_params as in _load_and_sync_parameters?
 
     def _setup_fp16(self):
         self.master_params = make_master_params(self.model_params)
@@ -201,7 +205,7 @@ class TrainLoop:
                 if os.environ.get("DIFFUSION_TRAINING_TEST", "") and self.step > 0:
                     return
             if self.step % self.sample_interval == 0:
-                self.sample_and_write_images(self.num_samples, self.batch_size // 2, self.class_cond, self.use_ddim,
+                self.sample_and_write_images(self.num_samples, self.batch_size, self.class_cond, self.use_ddim,
                                              self.image_size, self.clip_denoised)
             self.step += 1
         # Save the last checkpoint if it wasn't already saved.
@@ -279,18 +283,19 @@ class TrainLoop:
         for rate, params in zip(self.ema_rate, self.ema_params):
             update_ema(params, self.master_params, rate=rate) # keep ema of params; 0.999 to old, 0.001 to current
 
-    def write_2images(self, image_outputs, display_image_num, file_name):
-        image_outputs = image_outputs.expand(-1, 3, -1, -1)  # expand gray-scale images to 3 channels
-        image_grid = vutils.make_grid(image_outputs.data, nrow=display_image_num, padding=0, normalize=True)
-        vutils.save_image(image_grid, file_name)
-
     def sample_and_write_images(self, num_samples, batch_size, class_cond, use_ddim, image_size, clip_denoised):
-        latest_model_checkpoint = f"model{(self.step + self.resume_step):06d}.pt"
-        latest_model_checkpoint = bf.join(get_blob_logdir(), latest_model_checkpoint)
-        latest_ema_checkpoint = f"ema_{self.ema_rate[0]}_{(self.step + self.resume_step):06d}.pt"
-        latest_ema_checkpoint = bf.join(get_blob_logdir(), latest_ema_checkpoint)
-        # load latest ema checkpoint
-        self._load_checkpoint(latest_ema_checkpoint) #loads ema params, does not modify the existing grad values though.
+        # latest_model_checkpoint = f"model{(self.step + self.resume_step):06d}.pt"
+        # latest_model_checkpoint = bf.join(get_blob_logdir(), latest_model_checkpoint)
+        # latest_ema_checkpoint = f"ema_{self.ema_rate[0]}_{(self.step + self.resume_step):06d}.pt"
+        # latest_ema_checkpoint = bf.join(get_blob_logdir(), latest_ema_checkpoint)
+        # # load latest ema checkpoint
+        # self._load_checkpoint(latest_ema_checkpoint) #loads ema params, does not modify the existing grad values though.
+
+        # copy the current model params to be loaded later
+        model_params_copy = copy.deepcopy(self.master_params)
+
+        # load ema latest params
+        self._load_params(self.ema_params[0])
         # put model in eval mode
         self.model.eval()
 
@@ -303,10 +308,12 @@ class TrainLoop:
                 clip_denoised=clip_denoised
             )
         arr, label_arr = sample(sample_dict, logger, self.model, self.diffusion)
-        self.write_2images(image_outputs=arr, display_image_num=self.img_disp_nrow, file_name=bf.join(get_blob_logdir(),
+        write_2images(image_outputs=arr, display_image_num=self.img_disp_nrow, file_name=bf.join(get_blob_logdir(),
                                                 f"output_{(self.step + self.resume_step):06d}.jpg"))
-        #load latest model checkpoint and put in train mode
-        self._load_checkpoint(latest_model_checkpoint)
+        # #load latest model checkpoint and put in train mode
+        # self._load_checkpoint(latest_model_checkpoint)
+        # load latest model params
+        self._load_params(model_params_copy)
         self.model.train()
 
     def _log_grad_norm(self):

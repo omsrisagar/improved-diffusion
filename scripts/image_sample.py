@@ -19,6 +19,7 @@ from improved_diffusion.script_util import (
     add_dict_to_argparser,
     args_to_dict,
 )
+from improved_diffusion.script_util import write_2images
 
 def sample(args, logger, model, diffusion):
     logger.log("sampling...")
@@ -94,9 +95,14 @@ def main():
     )
     arr, label_arr = sample(sample_dict, logger, model, diffusion)
 
+    image_path = os.path.join(logger.get_dir(), f"output_{(args.step_num):06d}.jpg")
+    write_2images(image_outputs=arr, display_image_num=args.img_disp_nrow, file_name=image_path)
+
+    img_arr_path = os.path.join(logger.get_dir(), f"samples_{(args.step_num):06d}.npz")
+
     if dist.get_rank() == 0:
-        shape_str = "x".join([str(x) for x in arr.shape])
-        out_path = os.path.join(logger.get_dir(), f"samples_{shape_str}.npz")
+        # shape_str = "x".join([str(x) for x in arr.shape])
+        out_path = os.path.join(logger.get_dir(), img_arr_path)
         logger.log(f"saving to {out_path}")
         if args.class_cond:
             np.savez(out_path, arr, label_arr)
@@ -114,6 +120,8 @@ def create_argparser():
         batch_size=16,
         use_ddim=False,
         model_path="",
+        img_disp_nrow=2,
+        step_num=1000
     )
     defaults.update(model_and_diffusion_defaults())
     parser = argparse.ArgumentParser()

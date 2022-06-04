@@ -4,6 +4,7 @@ import inspect
 from . import gaussian_diffusion as gd
 from .respace import SpacedDiffusion, space_timesteps
 from .unet import SuperResModel, UNetModel
+import torchvision.utils as vutils
 
 NUM_CLASSES = 1000
 
@@ -294,3 +295,9 @@ def str2bool(v):
         return False
     else:
         raise argparse.ArgumentTypeError("boolean value expected")
+
+def write_2images(image_outputs, display_image_num, file_name):
+    image_outputs = image_outputs.expand(-1, 3, -1, -1)  # expand gray-scale images to 3 channels
+    image_grid = vutils.make_grid(image_outputs.data, nrow=display_image_num, padding=0, normalize=True)
+    vutils.save_image(image_grid, file_name)
+
