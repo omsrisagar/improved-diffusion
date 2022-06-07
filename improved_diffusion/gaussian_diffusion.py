@@ -263,7 +263,7 @@ class GaussianDiffusion:
             assert model_output.shape == (B, C * 2, *x.shape[2:])
             model_output, model_var_values = th.split(model_output, C, dim=1)
             if self.model_var_type == ModelVarType.LEARNED:
-                model_log_variance = model_var_values
+                model_log_variance = model_var_values # using the output directly as (log) variance
                 model_variance = th.exp(model_log_variance)
             else:
                 min_log = _extract_into_tensor(
@@ -271,7 +271,7 @@ class GaussianDiffusion:
                 ) # beta~ vector
                 max_log = _extract_into_tensor(np.log(self.betas), t, x.shape) # beta vector
                 # The model_var_values is [-1, 1] for [min_var, max_var].
-                frac = (model_var_values + 1) / 2
+                frac = (model_var_values + 1) / 2 # use output to get a vector; then convert to a point on range below
                 model_log_variance = frac * max_log + (1 - frac) * min_log # predicted variance
                 model_variance = th.exp(model_log_variance)
         else:
