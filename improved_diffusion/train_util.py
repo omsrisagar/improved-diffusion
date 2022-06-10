@@ -308,8 +308,10 @@ class TrainLoop:
                 clip_denoised=clip_denoised
             )
         arr, label_arr = sample(sample_dict, logger, self.model, self.diffusion)
-        write_2images(image_outputs=arr, display_image_num=self.img_disp_nrow, file_name=bf.join(get_blob_logdir(),
-                                                f"output_{(self.step + self.resume_step):06d}.jpg"))
+        if dist.get_rank() == 0:
+            write_2images(image_outputs=arr, display_image_num=self.img_disp_nrow, file_name=bf.join(get_blob_logdir(),
+                                                    f"output_{(self.step + self.resume_step):06d}.jpg"))
+        dist.barrier() # wait for rank 0 to finish writing image to filedisk
         # #load latest model checkpoint and put in train mode
         # self._load_checkpoint(latest_model_checkpoint)
         # load latest model params
