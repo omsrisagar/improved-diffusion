@@ -8,7 +8,9 @@ RUN apt-key adv --fetch-keys https://developer.download.nvidia.com/compute/cuda/
 RUN apt-key adv --fetch-keys https://developer.download.nvidia.com/compute/machine-learning/repos/ubuntu2004/x86_64/7fa2af80.pub
 CMD nvidia-smi
 
-ENV USER obayashi
+#ARG USER_ID
+#ARG GROUP_ID
+ENV USER srikanth
 ENV HOME /home/$USER
 ENV MPI_DIR=/opt/ompi
 ENV PATH="$MPI_DIR/bin:$HOME/.local/bin:$PATH"
@@ -45,15 +47,19 @@ RUN pip install -U -r requirements.txt
 #RUN pip install gym_minigrid -e git+https://github.com/omsrisagar/gym-minigrid.git@master#egg=gym_minigrid
 #RUN pip install jericho -e git+https://github.com/microsoft/jericho.git@6f761073ef064e62412c36cc8de569f57b39561c#egg=jericho
 
-#RUN groupadd -r obayashi \
-#    && useradd -r -g obayashi $USER \
-#    && chown -R obayashi:obayashi $HOME
 
 RUN apt-get update && apt-get install -y openssh-client
 
+#ARG USER_ID
+#ARG GROUP_ID
+#RUN addgroup --gid $GROUP_ID srikanth
+#RUN adduser --disabled-password --gecos '' --uid $USER_ID --gid $GROUP_ID srikanth
+#USER srikanth
+
+
 # Create a working directory and CD to it
 #WORKDIR $HOME/app
-WORKDIR /app
+WORKDIR $HOME/app
 #RUN ls -la /app
 #RUN pwd
 #RUN chown $USER:$USER -R /app/
@@ -76,6 +82,13 @@ ADD scripts ./scripts
 
 RUN pip install --editable .
 
+RUN groupadd -r srikanth \
+    && useradd -r -g srikanth $USER \
+    && chown -R srikanth:srikanth $HOME
+
+RUN chown -R srikanth:srikanth /home/srikanth/
+RUN chmod -R 755 /home/srikanth/
+#USER srikanth
 #RUN pip install babyai -e git+https://github.com/omsrisagar/babyai.git@kg#egg=babyai
 
 #CMD ["pwd"]
