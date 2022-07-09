@@ -718,25 +718,25 @@ class GaussianDiffusion:
                 model_output, model_var_values = th.split(model_output, C, dim=1)
                 # Learn the variance using the variational bound, but don't let
                 # it affect our mean prediction.
-                frozen_out = th.cat([model_output.detach(), model_var_values], dim=1)
-                terms["vb"] = self._vb_terms_bpd(
-                    model=lambda *args, r=frozen_out: r, # reuse the model output above as we don't want to cal again
+                frozen_out = th.cat([model_output.detach(), model_var_values], dim=1) # STOP GRADIENT of Lvlb to affect mean prediction
+                terms["vb"] = self._vb_terms_bpd( # To calc VLB loss, model's mean output gradient is detached (and not model's variance output); but for calculating MSE loss below, model's gradient is NOT detached.
+                    model=lambda *args, r=frozen_out: r,
                     x_start=x_start,
                     x_t=x_t,
                     t=t,
                     clip_denoised=False,
-                )["output"]
+                )["output"] # L_hybrid_without_lambda = L_simple + L_vlb
                 if self.loss_type == LossType.RESCALED_MSE:
                     # Divide by 1000 for equivalence with initial implementation.
                     # Without a factor of 1/1000, the VB term hurts the MSE term.
                     terms["vb"] *= self.num_timesteps / 1000.0 # probably lambda in L_hybrid: L_simple + lambda * L_vlb
 
             target = {
-                ModelMeanType.PREVIOUS_X: self.q_posterior_mean_variance(
+                ModelMeanType.PREVIOUS_X: self.q_posterior_mean_variance( # direct mu_theta prediction
                     x_start=x_start, x_t=x_t, t=t
                 )[0],
-                ModelMeanType.START_X: x_start,
-                ModelMeanType.EPSILON: noise,
+                ModelMeanType.START_X: x_start, # x_0 prediction
+                ModelMeanType.EPSILON: noise, # eps prediction
             }[self.model_mean_type]
             assert model_output.shape == target.shape == x_start.shape
             terms["mse"] = mean_flat((target - model_output) ** 2)

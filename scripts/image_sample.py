@@ -40,9 +40,9 @@ def sample(args, logger, model, diffusion):
             (args.batch_size, 3, args.image_size, args.image_size),
             clip_denoised=args.clip_denoised,
             model_kwargs=model_kwargs,
-        )
+        ) # between -1 & 1
         # sample = ((sample + 1) * 127.5).clamp(0, 255).to(th.uint8)
-        # sample = sample.permute(0, 2, 3, 1)
+        # sample = sample.permute(0, 2, 3, 1) # channels last is preferred for Computer Vision models in Pytorch
         # sample = sample.contiguous()
 
         gathered_samples = [th.zeros_like(sample) for _ in range(dist.get_world_size())]

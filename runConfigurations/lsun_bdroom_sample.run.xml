@@ -14,7 +14,7 @@
     <option name="ADD_SOURCE_ROOTS" value="true" />
     <EXTENSION ID="PythonCoverageRunConfigurationExtension" runner="coverage.py" />
     <option name="SCRIPT_NAME" value="$PROJECT_DIR$/scripts/image_sample.py" />
-    <option name="PARAMETERS" value="--image_size 64 --num_channels 128 --num_res_blocks 2 --num_heads 1 --learn_sigma True --use_scale_shift_norm False --attention_resolutions 16 --diffusion_steps 1000 --use_kl False --noise_schedule linear --rescale_learned_sigmas True --rescale_timesteps False --class_cond False --batch_size 4 --model_path output/lsun_debug/ema_0.9999_1010000.pt --timestep_respacing 5 --use_ddim False --num_samples 8" />
+    <option name="PARAMETERS" value="--image_size 64 --num_channels 128 --num_res_blocks 2 --num_heads 1 --learn_sigma True --use_scale_shift_norm False --attention_resolutions 16 --diffusion_steps 1000 --use_kl False --noise_schedule linear --rescale_learned_sigmas True --rescale_timesteps False --class_cond False --batch_size 4 --model_path output/lsun_debug/ema_0.9999_000100.pt --step_num 100 --timestep_respacing 5 --use_ddim False --num_samples 4" />
     <option name="SHOW_COMMAND_LINE" value="false" />
     <option name="EMULATE_TERMINAL" value="false" />
     <option name="MODULE_MODE" value="false" />

@@ -21,6 +21,7 @@ from .fp16_util import (
 from .nn import update_ema
 from .resample import LossAwareSampler, UniformSampler
 from scripts.image_sample import sample
+from scripts.super_res_sample import sample as sample_supres
 from .script_util import write_2images
 
 # For ImageNet experiments, this was a good default value.
@@ -206,7 +207,7 @@ class TrainLoop:
                     return
             if self.step % self.sample_interval == 0:
                 self.sample_and_write_images(self.num_samples, self.batch_size, self.class_cond, self.use_ddim,
-                                             self.image_size, self.clip_denoised)
+                                             self.image_size, self.clip_denoised, cond)
             self.step += 1
         # Save the last checkpoint if it wasn't already saved.
         if (self.step - 1) % self.save_interval != 0:
@@ -283,7 +284,7 @@ class TrainLoop:
         for rate, params in zip(self.ema_rate, self.ema_params):
             update_ema(params, self.master_params, rate=rate) # keep ema of params; 0.999 to old, 0.001 to current
 
-    def sample_and_write_images(self, num_samples, batch_size, class_cond, use_ddim, image_size, clip_denoised):
+    def sample_and_write_images(self, num_samples, batch_size, class_cond, use_ddim, image_size, clip_denoised, cond):
         # latest_model_checkpoint = f"model{(self.step + self.resume_step):06d}.pt"
         # latest_model_checkpoint = bf.join(get_blob_logdir(), latest_model_checkpoint)
         # latest_ema_checkpoint = f"ema_{self.ema_rate[0]}_{(self.step + self.resume_step):06d}.pt"
@@ -307,7 +308,11 @@ class TrainLoop:
                 image_size=image_size,
                 clip_denoised=clip_denoised
             )
-        arr, label_arr = sample(sample_dict, logger, self.model, self.diffusion)
+        if cond:
+            arr, arr_lowres, label_arr = sample_supres(sample_dict, iter([cond]), logger, self.model, self.diffusion)
+            arr = th.vstack([arr_lowres, arr])
+        else:
+            arr, label_arr = sample(sample_dict, logger, self.model, self.diffusion)
         if dist.get_rank() == 0:
             write_2images(image_outputs=arr, display_image_num=self.img_disp_nrow, file_name=bf.join(get_blob_logdir(),
                                                     f"output_{(self.step + self.resume_step):06d}.jpg"))

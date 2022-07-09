@@ -57,6 +57,11 @@ def main():
         schedule_sampler=schedule_sampler,
         weight_decay=args.weight_decay,
         lr_anneal_steps=args.lr_anneal_steps,
+        image_size=args.large_size,
+        sample_interval=args.sample_interval,
+        num_samples=args.num_samples,
+        use_ddim=args.use_ddim,
+        img_disp_nrow=args.img_disp_nrow
     ).run_loop()
 
 
@@ -84,11 +89,15 @@ def create_argparser():
         ema_rate="0.9999",
         log_interval=10,
         save_interval=10000,
+        sample_interval=10000,
+        num_samples=10000,
+        use_ddim=False,
+        img_disp_nrow=4,
         resume_checkpoint="",
         use_fp16=False,
         fp16_scale_growth=1e-3,
     )
-    defaults.update(sr_model_and_diffusion_defaults())
+    defaults.update(sr_model_and_diffusion_defaults()) # large_size, small_size added in this
     parser = argparse.ArgumentParser()
     add_dict_to_argparser(parser, defaults)
     return parser
