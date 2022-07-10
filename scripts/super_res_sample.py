@@ -34,7 +34,7 @@ def sample(args, data, logger, model, diffusion):
         model_kwargs = next(data)
         low_res = model_kwargs['low_res']
         upsampled = F.interpolate(low_res, (args.image_size, args.image_size), mode="bilinear")
-        all_lowres_images.append(upsampled)
+        upsampled = upsampled.to(dist_util.dev())
         model_kwargs = {k: v.to(dist_util.dev()) for k, v in model_kwargs.items()}
         if args.class_cond:
             classes = th.randint(
@@ -55,9 +55,12 @@ def sample(args, data, logger, model, diffusion):
         # sample = sample.contiguous()
 
         gathered_samples = [th.zeros_like(sample) for _ in range(dist.get_world_size())]
+        gathered_lowres_samples = [th.zeros_like(sample) for _ in range(dist.get_world_size())]
         dist.all_gather(gathered_samples, sample)  # gather not supported with NCCL
+        dist.all_gather(gathered_lowres_samples, upsampled)
         # all_images.extend([sample.cpu().numpy() for sample in gathered_samples])
         all_images.extend([sample.cpu() for sample in gathered_samples])
+        all_lowres_images.extend([sample.cpu() for sample in gathered_lowres_samples])
         if args.class_cond:
             gathered_labels = [
                 th.zeros_like(classes) for _ in range(dist.get_world_size())
