@@ -40,11 +40,19 @@ def main():
         class_cond=args.class_cond,
     )
 
+    test_data = load_superres_data(
+        args.test_dir,
+        args.batch_size,
+        large_size=args.large_size,
+        small_size=args.small_size,
+        class_cond=args.class_cond,
+    )
     logger.log("training...")
     TrainLoop(
         model=model,
         diffusion=diffusion,
         data=data,
+        test_data=test_data,
         batch_size=args.batch_size,
         microbatch=args.microbatch,
         lr=args.lr,
@@ -80,6 +88,7 @@ def load_superres_data(data_dir, batch_size, large_size, small_size, class_cond=
 def create_argparser():
     defaults = dict(
         data_dir="",
+        test_dir="",
         schedule_sampler="uniform",
         lr=1e-4,
         weight_decay=0.0,

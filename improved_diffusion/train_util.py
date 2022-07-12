@@ -1,6 +1,7 @@
 import copy
 import functools
 import os
+from argparse import Namespace
 
 import blobfile as bf
 import numpy as np
@@ -8,8 +9,9 @@ import torch as th
 import torch.distributed as dist
 from torch.nn.parallel.distributed import DistributedDataParallel as DDP
 from torch.optim import AdamW
-from argparse import Namespace
 
+from scripts.image_sample import sample
+from scripts.super_res_sample import sample as sample_supres
 from . import dist_util, logger
 from .fp16_util import (
     make_master_params,
@@ -20,8 +22,6 @@ from .fp16_util import (
 )
 from .nn import update_ema
 from .resample import LossAwareSampler, UniformSampler
-from scripts.image_sample import sample
-from scripts.super_res_sample import sample as sample_supres
 from .script_util import write_2images
 
 # For ImageNet experiments, this was a good default value.
@@ -37,6 +37,7 @@ class TrainLoop:
         model,
         diffusion,
         data,
+        test_data,
         batch_size,
         microbatch,
         lr,
@@ -60,6 +61,7 @@ class TrainLoop:
         self.model = model
         self.diffusion = diffusion
         self.data = data
+        self.test_data = test_data
         self.batch_size = batch_size
         self.microbatch = microbatch if microbatch > 0 else batch_size
         self.lr = lr
@@ -197,6 +199,7 @@ class TrainLoop:
             or self.step + self.resume_step < self.lr_anneal_steps
         ):
             batch, cond = next(self.data)
+            test_batch, test_cond = next(self.test_data)
             self.run_step(batch, cond)
             if self.step % self.log_interval == 0:
                 logger.dumpkvs()
@@ -207,7 +210,7 @@ class TrainLoop:
                     return
             if self.step % self.sample_interval == 0:
                 self.sample_and_write_images(self.num_samples, self.batch_size, self.class_cond, self.use_ddim,
-                                             self.image_size, self.clip_denoised, cond)
+                                             self.image_size, self.clip_denoised, batch, cond, test_batch, test_cond)
             self.step += 1
         # Save the last checkpoint if it wasn't already saved.
         if (self.step - 1) % self.save_interval != 0:
@@ -284,7 +287,8 @@ class TrainLoop:
         for rate, params in zip(self.ema_rate, self.ema_params):
             update_ema(params, self.master_params, rate=rate) # keep ema of params; 0.999 to old, 0.001 to current
 
-    def sample_and_write_images(self, num_samples, batch_size, class_cond, use_ddim, image_size, clip_denoised, cond):
+    def sample_and_write_images(self, num_samples, batch_size, class_cond, use_ddim, image_size, clip_denoised,
+                                batch, cond, test_batch, test_cond):
         # latest_model_checkpoint = f"model{(self.step + self.resume_step):06d}.pt"
         # latest_model_checkpoint = bf.join(get_blob_logdir(), latest_model_checkpoint)
         # latest_ema_checkpoint = f"ema_{self.ema_rate[0]}_{(self.step + self.resume_step):06d}.pt"
@@ -309,13 +313,21 @@ class TrainLoop:
                 clip_denoised=clip_denoised
             )
         if cond:
-            arr, arr_lowres, label_arr = sample_supres(sample_dict, iter([cond]), logger, self.model, self.diffusion)
-            arr = th.vstack([arr_lowres, arr])
+            arr, arr_lowres, arr_orig, label_arr = sample_supres(sample_dict, iter([cond]), logger, self.model,
+                                                           self.diffusion, iter([batch]))
+            arr = th.vstack([arr_orig, arr_lowres, arr])
+            test_arr, test_arr_lowres, test_arr_orig, test_label_arr = sample_supres(sample_dict, iter([test_cond]),
+                                                                 logger, self.model, self.diffusion, iter([test_batch]))
+            test_arr = th.vstack([test_arr_orig, test_arr_lowres, test_arr])
         else:
             arr, label_arr = sample(sample_dict, logger, self.model, self.diffusion)
+            test_arr = None
         if dist.get_rank() == 0:
             write_2images(image_outputs=arr, display_image_num=self.img_disp_nrow, file_name=bf.join(get_blob_logdir(),
                                                     f"output_{(self.step + self.resume_step):06d}.jpg"))
+            if test_arr is not None:
+                write_2images(image_outputs=test_arr, display_image_num=self.img_disp_nrow,
+                              file_name=bf.join(get_blob_logdir(), f"test_{(self.step + self.resume_step):06d}.jpg"))
         dist.barrier() # wait for rank 0 to finish writing image to filedisk
         # #load latest model checkpoint and put in train mode
         # self._load_checkpoint(latest_model_checkpoint)

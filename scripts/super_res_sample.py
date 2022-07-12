@@ -25,16 +25,20 @@ from improved_diffusion.script_util import (
 
 from improved_diffusion.script_util import write_2images
 
-def sample(args, data, logger, model, diffusion):
+def sample(args, data, logger, model, diffusion, orig=None):
     logger.log("creating samples...")
     all_images = []
     all_lowres_images = []
+    all_orig_images = []
     all_labels = []
     while len(all_images) * args.batch_size < args.num_samples:
         model_kwargs = next(data)
         low_res = model_kwargs['low_res']
         upsampled = F.interpolate(low_res, (args.image_size, args.image_size), mode="bilinear")
         upsampled = upsampled.to(dist_util.dev())
+        if orig is not None:
+            orig_images = next(orig)
+            orig_images = orig_images.to(dist_util.dev())
         model_kwargs = {k: v.to(dist_util.dev()) for k, v in model_kwargs.items()}
         if args.class_cond:
             classes = th.randint(
@@ -61,6 +65,10 @@ def sample(args, data, logger, model, diffusion):
         # all_images.extend([sample.cpu().numpy() for sample in gathered_samples])
         all_images.extend([sample.cpu() for sample in gathered_samples])
         all_lowres_images.extend([sample.cpu() for sample in gathered_lowres_samples])
+        if orig is not None:
+            gathered_orig_samples = [th.zeros_like(sample) for _ in range(dist.get_world_size())]
+            dist.all_gather(gathered_orig_samples, orig_images)
+            all_orig_images.extend([sample.cpu() for sample in gathered_orig_samples])
         if args.class_cond:
             gathered_labels = [
                 th.zeros_like(classes) for _ in range(dist.get_world_size())
@@ -75,13 +83,18 @@ def sample(args, data, logger, model, diffusion):
     arr = arr[: args.num_samples]
     arr_lowres = th.vstack(all_lowres_images)
     arr_lowres = arr_lowres[: args.num_samples]
+    if orig is not None:
+        arr_orig = th.vstack(all_orig_images)
+        arr_orig = arr_orig[: args.num_samples]
+    else:
+        arr_orig = None
     if args.class_cond:
         # label_arr = np.concatenate(all_labels, axis=0)
         label_arr = th.vstack(all_labels)
         label_arr = label_arr[: args.num_samples]
     else:
         label_arr = None
-    return arr, arr_lowres, label_arr
+    return arr, arr_lowres, arr_orig, label_arr
 
 def main():
     args = create_argparser().parse_args()
@@ -110,7 +123,7 @@ def main():
         image_size=args.large_size,
         clip_denoised=args.clip_denoised
     )
-    arr, arr_lowres, label_arr = sample(sample_dict, data, logger, model, diffusion)
+    arr, arr_lowres, _, label_arr = sample(sample_dict, data, logger, model, diffusion)
 
     arr = torch.vstack([arr_lowres, arr])
     image_path = os.path.join(logger.get_dir(), f"output_{(args.step_num):06d}.jpg")
