@@ -136,15 +136,15 @@ class TrainLoop:
 
         if resume_checkpoint:
             self.resume_step = parse_resume_step_from_filename(resume_checkpoint)
-            if dist.get_rank() == 0:
-                logger.log(f"loading model from checkpoint: {resume_checkpoint}...")
-                self.model.load_state_dict(
-                    dist_util.load_state_dict( # rank 0 reads the checkpoint as state_dict in bytes and broadcasts to # other ranks. Returns the read state_dict which can be used by self.model.load_state_dict; # similarly for self.opt.load_state_dict for optimizer checkpoint
-                        resume_checkpoint, map_location=dist_util.dev()
-                    )
+            # if dist.get_rank() == 0:
+            logger.log(f"loading model from checkpoint: {resume_checkpoint}...")
+            self.model.load_state_dict(
+                dist_util.load_state_dict( # rank 0 reads the checkpoint as state_dict in bytes and broadcasts to # other ranks. Returns the read state_dict which can be used by self.model.load_state_dict; # similarly for self.opt.load_state_dict for optimizer checkpoint
+                    resume_checkpoint, map_location=dist_util.dev()
                 )
+            )
 
-        dist_util.sync_params(self.model.parameters()) # just broadcast each param from rank 0 to all ranks; The # values of the variables inside dist_util.sync_params(...) are synced across ranks. So here the values of # self.model.parameters() are synced across ranks.
+        # dist_util.sync_params(self.model.parameters()) # just broadcast each param from rank 0 to all ranks; The # values of the variables inside dist_util.sync_params(...) are synced across ranks. So here the values of # self.model.parameters() are synced across ranks.
 
     def _load_checkpoint(self, checkpoint):
         if dist.get_rank() == 0:
@@ -167,14 +167,14 @@ class TrainLoop:
         main_checkpoint = find_resume_checkpoint() or self.resume_checkpoint
         ema_checkpoint = find_ema_checkpoint(main_checkpoint, self.resume_step, rate)
         if ema_checkpoint:
-            if dist.get_rank() == 0:
-                logger.log(f"loading EMA from checkpoint: {ema_checkpoint}...")
-                state_dict = dist_util.load_state_dict(
-                    ema_checkpoint, map_location=dist_util.dev()
-                )
-                ema_params = self._state_dict_to_master_params(state_dict) # just returns the values of params in the # state_dict; it obtains the names using self.model.named_parameters()
+            # if dist.get_rank() == 0:
+            logger.log(f"loading EMA from checkpoint: {ema_checkpoint}...")
+            state_dict = dist_util.load_state_dict(
+                ema_checkpoint, map_location=dist_util.dev()
+            )
+            ema_params = self._state_dict_to_master_params(state_dict) # just returns the values of params in the # state_dict; it obtains the names using self.model.named_parameters()
 
-        dist_util.sync_params(ema_params) # the values of this variable are synced across ranks
+        # dist_util.sync_params(ema_params) # the values of this variable are synced across ranks
         return ema_params
 
     def _load_optimizer_state(self):
