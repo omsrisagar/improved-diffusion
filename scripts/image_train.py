@@ -46,6 +46,7 @@ def main():
         model=model,
         diffusion=diffusion,
         data=data,
+        test_data=None,
         batch_size=args.batch_size,
         microbatch=args.microbatch,
         lr=args.lr,

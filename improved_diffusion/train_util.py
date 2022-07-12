@@ -199,7 +199,10 @@ class TrainLoop:
             or self.step + self.resume_step < self.lr_anneal_steps
         ):
             batch, cond = next(self.data)
-            test_batch, test_cond = next(self.test_data)
+            if self.test_data is not None:
+                test_batch, test_cond = next(self.test_data)
+            else:
+                test_batch = test_cond = None
             self.run_step(batch, cond)
             if self.step % self.log_interval == 0:
                 logger.dumpkvs()
