@@ -143,7 +143,7 @@ class TrainLoop:
                     resume_checkpoint, map_location=dist_util.dev()
                 )
             )
-
+        dist.barrier()
         # dist_util.sync_params(self.model.parameters()) # just broadcast each param from rank 0 to all ranks; The # values of the variables inside dist_util.sync_params(...) are synced across ranks. So here the values of # self.model.parameters() are synced across ranks.
 
     def _load_checkpoint(self, checkpoint):
@@ -173,7 +173,7 @@ class TrainLoop:
                 ema_checkpoint, map_location=dist_util.dev()
             )
             ema_params = self._state_dict_to_master_params(state_dict) # just returns the values of params in the # state_dict; it obtains the names using self.model.named_parameters()
-
+        dist.barrier()
         # dist_util.sync_params(ema_params) # the values of this variable are synced across ranks
         return ema_params
 

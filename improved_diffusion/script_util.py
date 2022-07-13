@@ -241,12 +241,12 @@ def create_gaussian_diffusion(
     timestep_respacing="",
 ):
     betas = gd.get_named_beta_schedule(noise_schedule, steps)
-    if use_kl: # L_vlb objective
-        loss_type = gd.LossType.RESCALED_KL
+    if use_kl:
+        loss_type = gd.LossType.RESCALED_KL # L_vlb objective (must have learn_sigma=True)
     elif rescale_learned_sigmas:
-        loss_type = gd.LossType.RESCALED_MSE # L_hybrid obj
+        loss_type = gd.LossType.RESCALED_MSE # L_hybrid obj (must have learn_sigma=True else won't take effect)
     else:
-        loss_type = gd.LossType.MSE # L_simple objective
+        loss_type = gd.LossType.MSE # L_simple objective if learn_sigma=False, else L_simple + L_vlb
     if not timestep_respacing:
         timestep_respacing = [steps]
     return SpacedDiffusion(
