@@ -37,7 +37,14 @@ RUN pip install --upgrade pip
 RUN pip install setuptools mpi4py
 RUN which mpicc
 
-RUN pip install torch==1.9.0+cu111 torchvision==0.10.0+cu111 torchaudio==0.9.0 -f https://download.pytorch.org/whl/torch_stable.html
+RUN pip install torch torchvision torchaudio --extra-index-url https://download.pytorch.org/whl/cu116
+#RUN pip install torch==1.9.0+cu111 torchvision==0.10.0+cu111 torchaudio==0.9.0 -f https://download.pytorch.org/whl/torch_stable.html
+#RUN apt update
+#RUN apt -y install wget
+#RUN wget https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2004/x86_64/cuda-keyring_1.0-1_all.deb
+#RUN dpkg -i cuda-keyring_1.0-1_all.deb
+#RUN apt update
+#RUN apt-get install libnccl2 libnccl-dev
 #ADD https://files.pythonhosted.org/packages/82/c8/13d273d42f60153b157a5d193e74ae3e1749745f3c2bf3c360b6d131d16e/blobfile-1.3.1-py3-none-any.whl .
 #RUN pip install blobfile-1.3.1-py3-none-any.whl 
 ADD requirements.txt .
