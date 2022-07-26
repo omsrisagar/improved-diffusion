@@ -1,11 +1,11 @@
 <component name="ProjectRunConfigurationManager">
-  <configuration default="false" name="lsun_bdroom_sample_superres_256_64" type="PythonConfigurationType" factoryName="Python">
+  <configuration default="false" name="obayashi_sample_superres_64_32" type="PythonConfigurationType" factoryName="Python">
     <module name="improved-diffusion" />
     <option name="INTERPRETER_OPTIONS" value="" />
     <option name="PARENT_ENVS" value="true" />
     <envs>
       <env name="PYTHONUNBUFFERED" value="1" />
-      <env name="OPENAI_LOGDIR" value="lsun_debug_superres" />
+      <env name="OPENAI_LOGDIR" value="obayashi_upsampling_64_32/test" />
     </envs>
     <option name="SDK_HOME" value="$USER_HOME$/miniconda3/envs/imp_gen/bin/python" />
     <option name="WORKING_DIRECTORY" value="$PROJECT_DIR$/" />
@@ -14,7 +14,7 @@
     <option name="ADD_SOURCE_ROOTS" value="true" />
     <EXTENSION ID="PythonCoverageRunConfigurationExtension" runner="coverage.py" />
     <option name="SCRIPT_NAME" value="$PROJECT_DIR$/scripts/super_res_sample.py" />
-    <option name="PARAMETERS" value="--large_size 256 --small_size 64 --num_channels 128 --num_res_blocks 2 --num_heads 1 --learn_sigma True --use_scale_shift_norm False --attention_resolutions 16 --diffusion_steps 1000 --use_kl False --noise_schedule linear --rescale_learned_sigmas True --rescale_timesteps False --class_cond False --batch_size 2 --model_path output/lsun_debug_superres/ema_0.9999_000000.pt --timestep_respacing 5 --use_ddim False --num_samples 4 --img_disp_nrow 2 --step_num 0 --base_samples output/lsun_debug/samples_000100.npz" />
+    <option name="PARAMETERS" value="--large_size 64 --small_size 32 --num_channels 128 --num_res_blocks 2 --num_heads 1 --learn_sigma True --use_scale_shift_norm False --attention_resolutions 16 --diffusion_steps 1000 --use_kl False --noise_schedule linear --rescale_learned_sigmas False --rescale_timesteps False --class_cond False --batch_size 128 --model_path output/obayashi_upsampling_64_32/ema_0.9999_320000.pt --use_ddim False --num_samples 128 --img_disp_nrow 16 --step_num 1 --write_lowres False --base_samples output/obayashi_lsimple_32x32/test/samples_000001.npz" />
     <option name="SHOW_COMMAND_LINE" value="false" />
     <option name="EMULATE_TERMINAL" value="false" />
     <option name="MODULE_MODE" value="false" />

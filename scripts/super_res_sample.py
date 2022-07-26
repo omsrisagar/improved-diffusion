@@ -121,13 +121,17 @@ def main():
         class_cond=args.class_cond,
         use_ddim=args.use_ddim,
         image_size=args.large_size,
-        clip_denoised=args.clip_denoised
+        clip_denoised=args.clip_denoised,
     )
     arr, arr_lowres, _, label_arr = sample(sample_dict, data, logger, model, diffusion)
 
-    arr = torch.vstack([arr_lowres, arr])
     image_path = os.path.join(logger.get_dir(), f"output_{(args.step_num):06d}.jpg")
-    write_2images(image_outputs=arr, display_image_num=args.img_disp_nrow, file_name=image_path)
+    if args.write_lowres:
+        arr_full = torch.vstack([arr_lowres, arr])
+        write_2images(image_outputs=arr_full, display_image_num=args.img_disp_nrow, file_name=image_path)
+    else:
+        write_2images(image_outputs=arr, display_image_num=args.img_disp_nrow, file_name=image_path)
+
 
     img_arr_path = os.path.join(logger.get_dir(), f"samples_{(args.step_num):06d}.npz")
 
@@ -137,7 +141,7 @@ def main():
         out_path = os.path.join(logger.get_dir(), img_arr_path)
         logger.log(f"saving to {out_path}")
         if args.class_cond:
-            np.savez(out_path, arr, label_arr)
+            np.savez(out_path, arr, label_arr) # samples should not include lowres
         else:
             np.savez(out_path, arr)
 
@@ -180,7 +184,8 @@ def create_argparser():
         base_samples="",
         model_path="",
         img_disp_nrow=2,
-        step_num=1000
+        step_num=1000,
+        write_lowres=True
     )
     defaults.update(sr_model_and_diffusion_defaults())
     parser = argparse.ArgumentParser()
