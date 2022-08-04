@@ -10,8 +10,8 @@ from improved_diffusion import dist_util, logger
 from improved_diffusion.image_datasets import load_data
 from improved_diffusion.resample import create_named_schedule_sampler
 from improved_diffusion.script_util import (
-    sr_model_and_diffusion_defaults,
-    sr_create_model_and_diffusion,
+    model_and_diffusion_defaults,
+    create_model_and_diffusion,
     args_to_dict,
     add_dict_to_argparser,
 )
@@ -25,26 +25,24 @@ def main():
     logger.configure()
 
     logger.log("creating model...")
-    model, diffusion = sr_create_model_and_diffusion(
-        **args_to_dict(args, sr_model_and_diffusion_defaults().keys())
+    model, diffusion = create_model_and_diffusion(
+        **args_to_dict(args, model_and_diffusion_defaults().keys())
     )
     model.to(dist_util.dev())
     schedule_sampler = create_named_schedule_sampler(args.schedule_sampler, diffusion)
 
     logger.log("creating data loader...")
-    data = load_superres_data(
+    data = load_cond_data(
         args.data_dir,
         args.batch_size,
-        large_size=args.large_size,
-        small_size=args.small_size,
+        image_size=args.image_size,
         class_cond=args.class_cond,
     )
 
-    test_data = load_superres_data(
+    test_data = load_cond_data(
         args.test_dir,
         args.batch_size,
-        large_size=args.large_size,
-        small_size=args.small_size,
+        image_size=args.image_size,
         class_cond=args.class_cond,
     )
     logger.log("training...")
@@ -65,7 +63,7 @@ def main():
         schedule_sampler=schedule_sampler,
         weight_decay=args.weight_decay,
         lr_anneal_steps=args.lr_anneal_steps,
-        image_size=args.large_size,
+        image_size=args.image_size,
         sample_interval=args.sample_interval,
         num_samples=args.num_samples,
         use_ddim=args.use_ddim,
@@ -73,15 +71,16 @@ def main():
     ).run_loop()
 
 
-def load_superres_data(data_dir, batch_size, large_size, small_size, class_cond=False):
+def load_cond_data(data_dir, batch_size, image_size, class_cond=False):
     data = load_data(
         data_dir=data_dir,
         batch_size=batch_size,
-        image_size=large_size,
+        image_size=image_size,
         class_cond=class_cond,
+        cond=True
     )
     for large_batch, model_kwargs in data:
-        model_kwargs["low_res"] = F.interpolate(large_batch, small_size, mode="area")
+        # model_kwargs["low_res"] = F.interpolate(large_batch, small_size, mode="area")
         yield large_batch, model_kwargs
 
 
@@ -106,7 +105,7 @@ def create_argparser():
         use_fp16=False,
         fp16_scale_growth=1e-3,
     )
-    defaults.update(sr_model_and_diffusion_defaults()) # large_size, small_size added in this
+    defaults.update(model_and_diffusion_defaults()) # large_size, small_size added in this
     parser = argparse.ArgumentParser()
     add_dict_to_argparser(parser, defaults)
     return parser

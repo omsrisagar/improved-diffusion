@@ -6,7 +6,7 @@ from torch.utils.data import DataLoader, Dataset
 
 
 def load_data(
-    *, data_dir, batch_size, image_size, class_cond=False, deterministic=False
+    *, data_dir, batch_size, image_size, class_cond=False, deterministic=False, cond=False
 ):
     """
     For a dataset, create a generator over (images, kwargs) pairs.
@@ -40,6 +40,7 @@ def load_data(
         classes=classes,
         shard=MPI.COMM_WORLD.Get_rank(),
         num_shards=MPI.COMM_WORLD.Get_size(),
+        cond=cond
     )
     if deterministic:
         loader = DataLoader(
@@ -66,17 +67,17 @@ def _list_image_files_recursively(data_dir):
 
 
 class ImageDataset(Dataset):
-    def __init__(self, resolution, image_paths, classes=None, shard=0, num_shards=1):
+    def __init__(self, resolution, image_paths, classes=None, shard=0, num_shards=1, cond=False):
         super().__init__()
         self.resolution = resolution
+        self.cond = cond
         self.local_images = image_paths[shard:][::num_shards]
         self.local_classes = None if classes is None else classes[shard:][::num_shards]
 
     def __len__(self):
         return len(self.local_images)
 
-    def __getitem__(self, idx):
-        path = self.local_images[idx]
+    def process_image(self, path):
         with bf.BlobFile(path, "rb") as f:
             pil_image = Image.open(f)
             pil_image.load()
@@ -99,8 +100,17 @@ class ImageDataset(Dataset):
         crop_x = (arr.shape[1] - self.resolution) // 2
         arr = arr[crop_y : crop_y + self.resolution, crop_x : crop_x + self.resolution]
         arr = arr.astype(np.float32) / 127.5 - 1 # converts 0 to 255 to -1 to 1 I guess
+        return arr
+
+    def __getitem__(self, idx):
+        path = self.local_images[idx]
+        arr = self.process_image(path)
 
         out_dict = {}
         if self.local_classes is not None:
             out_dict["y"] = np.array(self.local_classes[idx], dtype=np.int64)
+        if self.cond:
+            path_cond = str(path).replace('classB', 'classA')
+            arr_cond = self.process_image(path_cond)
+            out_dict["cond"] = np.transpose(arr_cond, [2, 0, 1])
         return np.transpose(arr, [2, 0, 1]), out_dict

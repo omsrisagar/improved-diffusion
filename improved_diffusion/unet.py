@@ -459,7 +459,7 @@ class UNetModel(nn.Module):
         """
         return next(self.input_blocks.parameters()).dtype
 
-    def forward(self, x, timesteps, y=None):
+    def forward(self, x, timesteps, y=None, cond=None):
         """
         Apply the model to an input batch.
 
@@ -471,6 +471,9 @@ class UNetModel(nn.Module):
         assert (y is not None) == (
             self.num_classes is not None
         ), "must specify y if and only if the model is class-conditional"
+
+        if cond is not None:
+            x = th.cat([x, cond], dim=1)
 
         hs = []
         emb = self.time_embed(timestep_embedding(timesteps, self.model_channels))
@@ -490,7 +493,7 @@ class UNetModel(nn.Module):
         h = h.type(x.dtype)
         return self.out(h)
 
-    def get_feature_vectors(self, x, timesteps, y=None):
+    def get_feature_vectors(self, x, timesteps, y=None, cond=None):
         """
         Apply the model and return all of the intermediate tensors.
 
@@ -503,6 +506,9 @@ class UNetModel(nn.Module):
                              block in the model.
                  - 'up': a list of hidden state tensors from upsampling.
         """
+        if cond is not None:
+            x = th.cat([x, cond], dim=1)
+
         hs = []
         emb = self.time_embed(timestep_embedding(timesteps, self.model_channels))
         if self.num_classes is not None:

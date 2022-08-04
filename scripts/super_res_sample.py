@@ -29,13 +29,15 @@ def sample(args, data, logger, model, diffusion, orig=None):
     logger.log("creating samples...")
     all_images = []
     all_lowres_images = []
+    all_cond_images = []
     all_orig_images = []
     all_labels = []
     while len(all_images) * args.batch_size < args.num_samples:
         model_kwargs = next(data)
-        low_res = model_kwargs['low_res']
-        upsampled = F.interpolate(low_res, (args.image_size, args.image_size), mode="bilinear")
-        upsampled = upsampled.to(dist_util.dev())
+        if 'low_res' in model_kwargs:
+            low_res = model_kwargs['low_res']
+            upsampled = F.interpolate(low_res, (args.image_size, args.image_size), mode="bilinear")
+            upsampled = upsampled.to(dist_util.dev())
         if orig is not None:
             orig_images = next(orig)
             orig_images = orig_images.to(dist_util.dev())
@@ -59,12 +61,19 @@ def sample(args, data, logger, model, diffusion, orig=None):
         # sample = sample.contiguous()
 
         gathered_samples = [th.zeros_like(sample) for _ in range(dist.get_world_size())]
-        gathered_lowres_samples = [th.zeros_like(sample) for _ in range(dist.get_world_size())]
         dist.all_gather(gathered_samples, sample)  # gather not supported with NCCL
-        dist.all_gather(gathered_lowres_samples, upsampled)
+        if 'low_res' in model_kwargs:
+            gathered_lowres_samples = [th.zeros_like(sample) for _ in range(dist.get_world_size())]
+            dist.all_gather(gathered_lowres_samples, upsampled)
+        elif 'cond' in model_kwargs:
+            gathered_cond_samples = [th.zeros_like(sample) for _ in range(dist.get_world_size())]
+            dist.all_gather(gathered_cond_samples, model_kwargs['cond'])
         # all_images.extend([sample.cpu().numpy() for sample in gathered_samples])
         all_images.extend([sample.cpu() for sample in gathered_samples])
-        all_lowres_images.extend([sample.cpu() for sample in gathered_lowres_samples])
+        if 'low_res' in model_kwargs:
+            all_lowres_images.extend([sample.cpu() for sample in gathered_lowres_samples])
+        elif 'cond' in model_kwargs:
+            all_cond_images.extend([sample.cpu() for sample in gathered_cond_samples])
         if orig is not None:
             gathered_orig_samples = [th.zeros_like(sample) for _ in range(dist.get_world_size())]
             dist.all_gather(gathered_orig_samples, orig_images)
@@ -81,8 +90,12 @@ def sample(args, data, logger, model, diffusion, orig=None):
     # arr = np.concatenate(all_images, axis=0)
     arr = th.vstack(all_images)
     arr = arr[: args.num_samples]
-    arr_lowres = th.vstack(all_lowres_images)
-    arr_lowres = arr_lowres[: args.num_samples]
+    if 'low_res' in model_kwargs:
+        arr_lowres = th.vstack(all_lowres_images)
+        arr_lowres = arr_lowres[: args.num_samples]
+    elif 'cond' in model_kwargs:
+        arr_cond = th.vstack(all_cond_images)
+        arr_cond = arr_cond[: args.num_samples]
     if orig is not None:
         arr_orig = th.vstack(all_orig_images)
         arr_orig = arr_orig[: args.num_samples]
@@ -94,7 +107,10 @@ def sample(args, data, logger, model, diffusion, orig=None):
         label_arr = label_arr[: args.num_samples]
     else:
         label_arr = None
-    return arr, arr_lowres, arr_orig, label_arr
+    if 'low_res' in model_kwargs:
+        return arr, arr_lowres, arr_orig, label_arr
+    else:
+        return arr, arr_cond, arr_orig, label_arr
 
 def main():
     args = create_argparser().parse_args()
