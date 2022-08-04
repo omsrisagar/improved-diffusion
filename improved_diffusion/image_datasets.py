@@ -102,6 +102,18 @@ class ImageDataset(Dataset):
         arr = arr.astype(np.float32) / 127.5 - 1 # converts 0 to 255 to -1 to 1 I guess
         return arr
 
+    # def __getitem__(self, idx):
+    #     path = self.local_images[idx]
+    #     arr = self.process_image(path)
+    #
+    #     out_dict = {}
+    #     if self.local_classes is not None:
+    #         out_dict["y"] = np.array(self.local_classes[idx], dtype=np.int64)
+    #     if self.cond:
+    #         path_cond = str(path).replace('classB', 'classA')
+    #         arr_cond = self.process_image(path_cond)
+    #         out_dict["cond"] = np.transpose(arr_cond, [2, 0, 1])
+    #     return np.transpose(arr, [2, 0, 1]), out_dict
     def __getitem__(self, idx):
         path = self.local_images[idx]
         arr = self.process_image(path)
@@ -110,7 +122,8 @@ class ImageDataset(Dataset):
         if self.local_classes is not None:
             out_dict["y"] = np.array(self.local_classes[idx], dtype=np.int64)
         if self.cond:
-            path_cond = str(path).replace('classB', 'classA')
-            arr_cond = self.process_image(path_cond)
-            out_dict["cond"] = np.transpose(arr_cond, [2, 0, 1])
+            out_dict["cond"] = np.transpose(arr, [2, 0, 1])
+            path_cond = str(path).replace('classA', 'classB')
+            arr = self.process_image(path_cond)
+            # out_dict["cond"] = np.transpose(arr_cond, [2, 0, 1])
         return np.transpose(arr, [2, 0, 1]), out_dict
