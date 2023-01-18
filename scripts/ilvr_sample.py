@@ -149,7 +149,8 @@ def main():
     # down = Resizer(shape, 1 / args.down_N).to(next(model.parameters()).device)
     # up = Resizer(shape_d, args.down_N).to(next(model.parameters()).device)
     # resizers = (down, up)
-    resizers = None
+    # resizers = None
+    resizers = 'hf_filter'
 
     logger.log("loading data...")
     data = load_reference(
