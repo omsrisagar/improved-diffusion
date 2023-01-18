@@ -1,11 +1,11 @@
 <component name="ProjectRunConfigurationManager">
-  <configuration default="false" name="ilvr_sample_64x64" type="PythonConfigurationType" factoryName="Python">
+  <configuration default="false" name="ilvr_sample_32x32" type="PythonConfigurationType" factoryName="Python">
     <module name="improved-diffusion" />
     <option name="INTERPRETER_OPTIONS" value="" />
     <option name="PARENT_ENVS" value="true" />
     <envs>
       <env name="PYTHONUNBUFFERED" value="1" />
-      <env name="OPENAI_LOGDIR" value="obayashi_ilvr_sample_64x64" />
+      <env name="OPENAI_LOGDIR" value="obayashi_ilvr_sample_32x32" />
     </envs>
     <option name="SDK_HOME" value="$USER_HOME$/miniconda3/envs/imp_gen/bin/python" />
     <option name="SDK_NAME" value="Python 3.7 (imp_gen)" />
@@ -15,7 +15,7 @@
     <option name="ADD_SOURCE_ROOTS" value="true" />
     <EXTENSION ID="PythonCoverageRunConfigurationExtension" runner="coverage.py" />
     <option name="SCRIPT_NAME" value="$PROJECT_DIR$/scripts/ilvr_sample.py" />
-    <option name="PARAMETERS" value="--image_size 64 --num_channels 128 --num_res_blocks 2 --num_heads 1 --learn_sigma False --use_scale_shift_norm False --attention_resolutions 16 --diffusion_steps 1000 --use_kl False --dropout 0.0 --noise_schedule linear --rescale_learned_sigmas False --rescale_timesteps False --use_fp16 False --class_cond False --batch_size 10 --num_samples 20 --img_disp_nrow 10 --model_path output/obayashi_ilvr_sample_64x64/ema_0.9999_580000.pt --base_samples ref_imgs/trainA_64x64/ --down_N 8 --range_t 750" />
+    <option name="PARAMETERS" value="--image_size 32 --num_channels 128 --num_res_blocks 2 --num_heads 1 --learn_sigma False --use_scale_shift_norm False --attention_resolutions 16 --diffusion_steps 1000 --use_kl False --dropout 0.0 --noise_schedule linear --rescale_learned_sigmas False --rescale_timesteps False --use_fp16 False --class_cond False --batch_size 20 --num_samples 20 --img_disp_nrow 10 --model_path output/obayashi_ilvr_sample_32x32/ema_0.9999_300000.pt --base_samples ref_imgs/trainA_32x32/ --save_dir output/obayashi_ilvr_sample_32x32/guided_filter/training_data/radius_7/ --down_N 8 --range_t 600" />
     <option name="SHOW_COMMAND_LINE" value="false" />
     <option name="EMULATE_TERMINAL" value="false" />
     <option name="MODULE_MODE" value="false" />

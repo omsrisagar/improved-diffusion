@@ -9,11 +9,22 @@ import enum
 import math
 
 import numpy as np
+import torch
 import torch as th
 
 from .nn import mean_flat
 from .losses import normal_kl, discretized_gaussian_log_likelihood
+import kornia
+import torchvision
+import matplotlib.pyplot as plt
+from scripts.guided_filter import GuidedFilter2d, FastGuidedFilter2d
 
+def imshow(input: torch.Tensor):
+    out: torch.Tensor = torchvision.utils.make_grid(input, nrow=5, padding=1, normalize=True)
+    out_np: np.ndarray = kornia.tensor_to_image(out)
+    plt.imshow(out_np)
+    plt.axis('off')
+    plt.show()
 
 def get_named_beta_schedule(schedule_name, num_diffusion_timesteps):
     """
@@ -167,6 +178,7 @@ class GaussianDiffusion:
             * np.sqrt(alphas)
             / (1.0 - self.alphas_cumprod)
         )
+        self.guided_filter = GuidedFilter2d(radius=7, eps=1e-5).to(0)
 
     def q_mean_variance(self, x_start, t):
         """
@@ -547,7 +559,26 @@ class GaussianDiffusion:
                     if i > range_t:
                         out["sample"] = out["sample"] - up(down(out["sample"])) + up(
                             down(self.q_sample(model_kwargs["ref_img"], t, th.randn(*shape, device=device))))
-
+                # HF filtering
+                if i > range_t:
+                # if i < 100:
+                #     # hf_sam = kornia.filters.laplacian(out['sample'], 5)
+                #     # hf_sam = kornia.filters.laplacian(kornia.filters.gaussian_blur2d(out['sample'], (7, 7), (1.5, 1.5)), 5) # apply gaussian blur first before edge detection
+                #     # hf_sam = kornia.filters.laplacian(kornia.filters.median_blur(out['sample'], (5, 5)), 5)
+                #     hf_sam = kornia.filters.laplacian(kornia.filters.box_blur(out['sample'], (5,5)), 5)
+                #     print(f'hf_sam: max {hf_sam.max()}, min {hf_sam.min()}')
+                #     ref_t = self.q_sample(model_kwargs["ref_img"], t, th.randn(*shape, device=device))
+                #     # hf_ref = kornia.filters.laplacian(ref_t, 5)
+                #     # hf_ref = kornia.filters.laplacian(kornia.filters.gaussian_blur2d(ref_t, (7, 7), (1.5, 1.5)), 5) # apply gaussian blur first before edge detection
+                #     # hf_ref = kornia.filters.laplacian(kornia.filters.median_blur(ref_t, (5, 5)), 5)
+                #     hf_ref = kornia.filters.laplacian(kornia.filters.box_blur(ref_t, (5,5)), 5)
+                #     print(f'hf_ref: max {hf_ref.max()}, min {hf_ref.min()}')
+                #     out["sample"] = out["sample"] - hf_sam + hf_ref
+                    ref_t = self.q_sample(model_kwargs["ref_img"], t, th.randn(*shape, device=device))
+                    out['sample'] = self.guided_filter(out['sample'], ref_t)
+                    # sam = out['sample']
+                    # print(f'out: max {sam.max()}, min {sam.min()}')
+                    # out["sample"] = torch.clamp(out['sample'], min=-10.0, max=10.0)
                 yield out
                 img = out["sample"]
 

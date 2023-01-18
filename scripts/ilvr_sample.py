@@ -5,6 +5,9 @@ import blobfile as bf
 import numpy as np
 import torch as th
 import torch.distributed as dist
+import torchvision
+import kornia
+import matplotlib.pyplot as plt
 
 from improved_diffusion import dist_util, logger
 from improved_diffusion.script_util import (
@@ -22,6 +25,13 @@ from resizer import Resizer
 import math
 
 from improved_diffusion.script_util import write_2images
+
+def imshow(input: th.Tensor, normalize=False):
+    out: th.Tensor = torchvision.utils.make_grid(input, nrow=5, padding=1, normalize=normalize)
+    out_np: np.ndarray = kornia.tensor_to_image(out)
+    plt.imshow(out_np)
+    plt.axis('off')
+    plt.show()
 
 def sample(args, data, logger, model, diffusion, resizers, orig=None):
     logger.log("creating samples...")
@@ -59,9 +69,10 @@ def sample(args, data, logger, model, diffusion, resizers, orig=None):
         gathered_cond_samples = [th.zeros_like(sample) for _ in range(dist.get_world_size())]
         dist.all_gather(gathered_samples, sample)  # gather not supported with NCCL
         dist.all_gather(gathered_cond_samples, model_kwargs['ref_img'])
-        # all_images.extend([sample.cpu().numpy() for sample in gathered_samples])
-        all_images.extend([sample.cpu() for sample in gathered_samples])
-        all_cond_images.extend([sample.cpu() for sample in gathered_cond_samples])
+        # all_images.extend([sample.cpu() for sample in gathered_samples])
+        # all_cond_images.extend([sample.cpu() for sample in gathered_cond_samples])
+        all_images.extend([sample.cpu() for sample in [sample]])
+        all_cond_images.extend([sample.cpu() for sample in [model_kwargs['ref_img']]])
         if orig is not None:
             gathered_orig_samples = [th.zeros_like(sample) for _ in range(dist.get_world_size())]
             dist.all_gather(gathered_orig_samples, orig_images)
@@ -113,8 +124,8 @@ def main():
     # th.manual_seed(0)
 
     dist_util.setup_dist()
-    # logger.configure(dir=args.save_dir)
-    logger.configure()
+    logger.configure(dir=args.save_dir)
+    # logger.configure()
     args.step_num = parse_resume_step_from_filename(args.model_path)
     logger.log(f"Step num noted as {args.step_num}")
 
@@ -135,9 +146,10 @@ def main():
 
     shape = (args.batch_size, 3, args.image_size, args.image_size)
     shape_d = (args.batch_size, 3, int(args.image_size / args.down_N), int(args.image_size / args.down_N))
-    down = Resizer(shape, 1 / args.down_N).to(next(model.parameters()).device)
-    up = Resizer(shape_d, args.down_N).to(next(model.parameters()).device)
-    resizers = (down, up)
+    # down = Resizer(shape, 1 / args.down_N).to(next(model.parameters()).device)
+    # up = Resizer(shape_d, args.down_N).to(next(model.parameters()).device)
+    # resizers = (down, up)
+    resizers = None
 
     logger.log("loading data...")
     data = load_reference(
@@ -217,6 +229,7 @@ def create_argparser():
         use_ddim=False,
         base_samples="",
         model_path="",
+        save_dir="",
         img_disp_nrow=1,
         step_num=0,
         use_fp16=False, # place holder only not used

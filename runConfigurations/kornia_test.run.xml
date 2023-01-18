@@ -1,20 +1,20 @@
 <component name="ProjectRunConfigurationManager">
-  <configuration default="false" name="lsun_bdroom_resume" type="PythonConfigurationType" factoryName="Python">
+  <configuration default="false" name="kornia_test" type="PythonConfigurationType" factoryName="Python" nameIsGenerated="true">
     <module name="improved-diffusion" />
     <option name="INTERPRETER_OPTIONS" value="" />
     <option name="PARENT_ENVS" value="true" />
     <envs>
       <env name="PYTHONUNBUFFERED" value="1" />
-      <env name="OPENAI_LOGDIR" value="lsun_debug" />
     </envs>
     <option name="SDK_HOME" value="$USER_HOME$/miniconda3/envs/imp_gen/bin/python" />
+    <option name="SDK_NAME" value="Python 3.7 (imp_gen)" />
     <option name="WORKING_DIRECTORY" value="$PROJECT_DIR$/" />
     <option name="IS_MODULE_SDK" value="false" />
     <option name="ADD_CONTENT_ROOTS" value="true" />
     <option name="ADD_SOURCE_ROOTS" value="true" />
     <EXTENSION ID="PythonCoverageRunConfigurationExtension" runner="coverage.py" />
-    <option name="SCRIPT_NAME" value="$PROJECT_DIR$/scripts/image_train.py" />
-    <option name="PARAMETERS" value="--image_size 64 --num_channels 128 --num_res_blocks 2 --num_heads 1 --learn_sigma True --use_scale_shift_norm False --attention_resolutions 16 --diffusion_steps 1000 --use_kl False --noise_schedule linear --rescale_learned_sigmas True --rescale_timesteps False --schedule_sampler uniform --class_cond False --lr 1e-4 --batch_size 4 --save_interval 100 --sample_interval 100 --num_samples 4 --data_dir datasets/canny2buildings1a/test/classB --resume_checkpoint output/lsun_debug/model000100.pt" />
+    <option name="SCRIPT_NAME" value="$PROJECT_DIR$/scripts/kornia_test.py" />
+    <option name="PARAMETERS" value="" />
     <option name="SHOW_COMMAND_LINE" value="false" />
     <option name="EMULATE_TERMINAL" value="false" />
     <option name="MODULE_MODE" value="false" />
