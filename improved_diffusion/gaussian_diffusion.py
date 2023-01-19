@@ -652,10 +652,10 @@ class GaussianDiffusion:
                  - 'output': a shape [N] tensor of NLLs or KLs.
                  - 'pred_xstart': the x_0 predictions.
         """
-        true_mean, _, true_log_variance_clipped = self.q_posterior_mean_variance(
+        true_mean, _, true_log_variance_clipped = self.q_posterior_mean_variance( # p(x_t-1 | x_t, x0) actual
             x_start=x_start, x_t=x_t, t=t
         )
-        out = self.p_mean_variance(
+        out = self.p_mean_variance( # p(x_t-1 | x_t) predicted
             model, x_t, t, clip_denoised=clip_denoised, model_kwargs=model_kwargs
         )
         kl = normal_kl(
@@ -741,7 +741,7 @@ class GaussianDiffusion:
             assert model_output.shape == target.shape == x_start.shape
             terms["mse"] = mean_flat((target - model_output) ** 2)
             if "vb" in terms:
-                terms["loss"] = terms["mse"] + terms["vb"] # L_simple + (scaled) L_vlb
+                terms["loss"] = terms["mse"] + terms["vb"] # L_simple + (scaled if losstype=RESCALED_MSE) L_vlb # non-scaled ones may not be good as per comment above as it hurts the imp. MSE term.
             else:
                 terms["loss"] = terms["mse"] # L_simple only
         else:
